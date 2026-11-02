@@ -3,7 +3,7 @@
   // 바탕화면 프로그램(WebView2) 안에서 열리면 HOST 로 창 제어·파일 저장을 주고받는다.
   const HOST = (window.chrome && window.chrome.webview) || null;
   const KEY = 'manneung-diary-v1';
-  const VERSION = '1.2';
+  const VERSION = '1.2.1';
   const SVGNS = 'http://www.w3.org/2000/svg';
   const WD = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -18,6 +18,7 @@
     left: '<path d="m14.5 18-6-6 6-6"/>',
     right: '<path d="m9.5 18 6-6-6-6"/>',
     down: '<path d="m7 10 5 5 5-5"/>',
+    up: '<path d="m7 14 5-5 5 5"/>',
     gear: '<path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="17" r="2"/>',
     pin: '<path d="M12 16.5V21"/><path d="M8.5 3.5h7l-1 5.5 3 4H6.5l3-4z"/>',
     minus: '<path d="M6 12h12"/>',
@@ -1439,6 +1440,15 @@
     });
     inp.click();
   }
+  // 색 분류 순서 바꾸기: 칠할 색 줄·색 고르기 목록·합계 범례가 이 순서를 따른다.
+  function moveCat(i, d) {
+    const cats = S.settings.cats, j = i + d;
+    if (j < 0 || j >= cats.length) return;
+    const c = cats.splice(i, 1)[0];
+    cats.splice(j, 0, c);
+    save();
+    drawSheet();
+  }
   // 지운 기본 분류만 원래 자리·이름·색으로 되살린다. 이름이나 색을 바꾼 분류와 직접 만든 분류는 그대로 둔다.
   function restoreDefaultCats() {
     const cur = S.settings.cats;
@@ -1466,6 +1476,8 @@
           st.cats.map((c, i) => h('div.ed-item.cat-ed',
             h('input', { type: 'color', value: c.color, title: '색 바꾸기', oninput: e => { c.color = e.target.value; save(); } , onchange: () => drawSheet() }),
             h('input.bare', { value: c.name, oninput: e => { c.name = e.target.value; save(); } }),
+            h('button.ib.sm', { title: '위로', disabled: i === 0, onclick: () => moveCat(i, -1) }, icon('up')),
+            h('button.ib.sm', { title: '아래로', disabled: i === st.cats.length - 1, onclick: () => moveCat(i, 1) }, icon('down')),
             h('button.ib.sm', {
               title: '삭제', disabled: st.cats.length <= 1,
               onclick: () => {

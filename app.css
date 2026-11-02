@@ -589,6 +589,8 @@ textarea.bare { resize: none; line-height: 1.6; display: block; }
 .mini-cells i { width: 6px; height: 12px; border-radius: 2px; background: #e6e8f2; }
 .mini-cells i.p { background: var(--c); }
 .btn:disabled { opacity: .45; cursor: default; }
+.ib:disabled { opacity: .25; cursor: default; background: none; }
+.cat-ed .ib.sm { width: 24px; }
 
 /* ---------- 일기 ---------- */
 .moods { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
