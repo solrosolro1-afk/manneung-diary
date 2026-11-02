@@ -3,7 +3,7 @@
   // 바탕화면 프로그램(WebView2) 안에서 열리면 HOST 로 창 제어·파일 저장을 주고받는다.
   const HOST = (window.chrome && window.chrome.webview) || null;
   const KEY = 'manneung-diary-v1';
-  const VERSION = '1.2.1';
+  const VERSION = '1.3';
   const SVGNS = 'http://www.w3.org/2000/svg';
   const WD = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -58,6 +58,8 @@
   const TABS = [['home', '오늘', 'home'], ['day', '일간', 'day'], ['journal', '일기', 'book'], ['month', '월간', 'month'],
     ['year', '연간', 'year'], ['habit', '습관', 'habit'], ['memo', '메모', 'memo']];
   const YEAR_DEFAULT_COLOR = '#fbbf24';
+  const FOCUS = ['H', 'M', 'L'];
+  const FOCUS_NAME = { H: '높음', M: '보통', L: '낮음' };
 
   // ---------- 작은 도구 ----------
   const $ = (s, el) => (el || document).querySelector(s);
@@ -202,24 +204,25 @@
   function actOf(k, hr, create) {
     const D = day(k, create);
     if (!D) return null;
-    if (!D.act[hr] && create) D.act[hr] = { cells: [null, null, null, null, null, null], m: '' };
+    if (!D.act[hr] && create) D.act[hr] = { cells: [null, null, null, null, null, null], m: '', f: '' };
     return D.act[hr] || null;
   }
   function tidyDay(k) {
     const D = S.days[k];
     if (!D) return;
     for (const hr in D.plan) { const p = D.plan[hr]; if (!p.t.trim() && !p.c && !p.d) delete D.plan[hr]; }
-    for (const hr in D.act) { const a = D.act[hr]; if (!a.cells.some(Boolean) && !a.m.trim()) delete D.act[hr]; }
+    for (const hr in D.act) { const a = D.act[hr]; if (!a.cells.some(Boolean) && !a.m.trim() && !a.f) delete D.act[hr]; }
   }
   function dayHasData(D) {
     if (!D) return false;
     return D.todos.some(t => t.t.trim()) || Object.values(D.plan).some(p => p.t.trim()) ||
-      Object.values(D.act).some(a => a.cells.some(Boolean) || a.m.trim()) || !!D.see.trim();
+      Object.values(D.act).some(a => a.cells.some(Boolean) || a.m.trim() || a.f) || !!D.see.trim();
   }
   function dayStats(k) {
-    const r = { total: 0, done: 0, mins: 0, byCat: {} };
+    const r = { total: 0, done: 0, mins: 0, byCat: {}, focus: { H: 0, M: 0, L: 0 } };
     const D = S.days[k];
     if (!D) return r;
+    for (const a of Object.values(D.act)) if (a.f && r.focus[a.f] != null) r.focus[a.f]++;
     for (const p of Object.values(D.plan)) if (p.t.trim()) { r.total++; if (p.d) r.done++; }
     for (const t of D.todos) if (t.t.trim()) { r.total++; if (t.d) r.done++; }
     for (const a of Object.values(D.act)) for (const c of a.cells) if (c) { r.mins += 10; r.byCat[c] = (r.byCat[c] || 0) + 10; }
@@ -520,7 +523,7 @@
       const start = (+S.settings.startHour || 0) % 24;
       range(24).map(i => (start + i) % 24).forEach(hr => {
         const p = P.plan[hr], a = P.act[hr];
-        const hasP = !!(p && p.t.trim()), hasA = !!(a && (a.cells.some(Boolean) || a.m.trim()));
+        const hasP = !!(p && p.t.trim()), hasA = !!(a && (a.cells.some(Boolean) || a.m.trim() || a.f));
         if (hasP || hasA) out.push({ k: 'p' + hr, hr, p: hasP ? p : null, a: hasA ? a : null });
       });
       P.todos.filter(t => t.t.trim()).forEach(t => out.push({ k: 't' + t.id, t }));
@@ -705,7 +708,7 @@
             if (!P || !P.t.trim()) return;
             P.d = !P.d; save(); render();
           }, !hasT),
-          h('input.bare' + (p && p.d ? '.done-text' : ''), {
+          h('input.bare', {
             value: p ? p.t : '', dataset: { row: i, col: 'p' }, 'aria-label': `${hr}시 계획`,
             oninput: e => {
               const P = planOf(k, hr, true);
@@ -731,7 +734,12 @@
             oninput: e => { actOf(k, hr, true).m = e.target.value; save(); },
             onblur: () => { tidyDay(k); },
             onkeydown: rowKeys
-          })));
+          })),
+        // 그 시간 업무 집중도: H·M·L 중 하나를 체크(다시 누르면 해제)
+        h('div.fcol', FOCUS.map(f => h('button.fbtn.f' + f + (a && a.f === f ? '.on' : ''), {
+          type: 'button', title: `집중도 ${f} (${FOCUS_NAME[f]})`,
+          onclick: () => { const A = actOf(k, hr, true); A.f = A.f === f ? '' : f; tidyDay(k); save(); render(); }
+        }, f))));
     });
 
     const body = h('div.tl-body', rows, h('div.nowline', { hidden: true }));
@@ -771,7 +779,7 @@
     body.addEventListener('lostpointercapture', end);
 
     return h('div.card.tl',
-      h('div.tl-top', brushes, h('div.tl-cols', h('span', 'PLAN 계획'), h('span', '시'), h('span', 'DO 실적 (칠하기·메모)'))),
+      h('div.tl-top', brushes, h('div.tl-cols', h('span', 'PLAN 계획'), h('span', '시'), h('span', 'DO 실적 (칠하기·메모)'), h('span', '집중'))),
       body);
   }
 
@@ -788,7 +796,9 @@
       st.mins
         ? [h('div.stack', segs.map(s => h('i', { title: `${catName(s[0])} ${fmtMin(s[1])}`, style: { '--c': catColor(s[0]) || '#cbd5e1', width: (s[1] / st.mins * 100) + '%' } }))),
           h('div.legend', segs.map(s => h('span', h('span.dot', { style: { '--c': catColor(s[0]) || '#cbd5e1' } }), catName(s[0]), h('b', fmtMin(s[1])))))]
-        : h('div.empty', { style: { marginTop: '8px' } }, 'DO 칸을 색으로 칠하면 시간 사용이 분류별로 모입니다.'));
+        : h('div.empty', { style: { marginTop: '8px' } }, 'DO 칸을 색으로 칠하면 시간 사용이 분류별로 모입니다.'),
+      FOCUS.some(f => st.focus[f]) ? h('div.legend.focus-sum', h('span.muted', '집중도'),
+        FOCUS.filter(f => st.focus[f]).map(f => h('span', h('i.fbtn.on.f' + f, f), FOCUS_NAME[f], h('b', st.focus[f] + '시간')))) : null);
   }
   function refreshSummary() {
     const old = $('.sum-card');
@@ -906,7 +916,7 @@
         if (!p || !p.t.trim()) return;
         pl.push(h('div.pl', h('span.tm', pad(hr) + ':00'),
           chkBtn(p.d, catColor(p.c), () => { p.d = !p.d; save(); render(); }),
-          h('span.tx' + (p.d ? '.done-text' : ''), p.t)));
+          h('span.tx', p.t)));
       });
       D.todos.forEach(t => {
         if (!t.t.trim()) return;
@@ -1634,6 +1644,12 @@
             h('button.btn.pri', {
               onclick: () => { if (!SYNC.configure(ta.value)) toast('설정 코드에서 apiKey·authDomain·projectId·appId 를 찾지 못했습니다'); }
             }, '연결 설정 저장')));
+      } else if (!SYNC.ready) {
+        out.push(h('div.sec',
+          h('div.muted', { style: { fontSize: '13px', lineHeight: '1.6' } },
+            '동기화 서버에 아직 연결되지 않았습니다. 로그인 정보는 이 기기에 남아 있어서, 인터넷이 연결되면 자동으로 다시 이어집니다.'),
+          h('div.row', { style: { justifyContent: 'flex-end', marginTop: '8px' } },
+            h('button.btn.pri', { onclick: () => SYNC.retry() }, icon('sync'), '지금 다시 연결'))));
       } else if (st.mode === 'out' || (st.mode === 'err' && !st.email)) {
         const em = h('input.field', { type: 'email', placeholder: '이메일', autocomplete: 'username', dataset: { focus: 'sync-email' } });
         const pw = h('input.field', { type: 'password', placeholder: '비밀번호 (6자 이상)', autocomplete: 'current-password', style: { marginTop: '8px' } });
@@ -1652,7 +1668,7 @@
       } else {
         out.push(
           h('div.sec', setRow('계정', st.email, h('button.btn.sm', { onclick: () => SYNC.signOut() }, '로그아웃')),
-            setRow('지금 동기화', '바꾼 내용은 5초 뒤, 그 밖에는 1분 반마다 자동으로 주고받음',
+            setRow('지금 동기화', '바꾼 내용은 5초 뒤 보내고, 30분마다·프로그램을 켤 때 자동으로 주고받음. 로그인은 계속 유지됨',
               h('button.btn.sm.pri', { onclick: () => SYNC.syncNow(true) }, icon('sync'), '동기화'))));
       }
       if (SYNC.configured && !SYNC.builtIn) {

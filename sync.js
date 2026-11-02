@@ -131,6 +131,9 @@
   function create(api) {
     const state = { mode: 'off', msg: '', email: '', last: 0 };
     let fb = null, user = null, base = null, lastMs = 0, running = false, again = false, timer = 0, lastTry = 0;
+    let bootCfg = null, booting = false, bootTimer = 0, bootDelay = 15000;
+    const AUTO_MS = 30 * 60 * 1000; // 30분마다 자동 동기화
+    const FOCUS_MS = 5 * 60 * 1000;  // 창으로 돌아오면 5분이 지났을 때 한 번 받기
 
     const setMode = (mode, msg) => { state.mode = mode; state.msg = msg || ''; api.onStatus(); };
     const savedConfig = () => {
@@ -138,7 +141,12 @@
       try { return JSON.parse(localStorage.getItem(LS_CFG) || 'null'); } catch (e) { return null; }
     };
 
+    // 컴퓨터를 막 켰을 때처럼 인터넷이 아직 안 되면 연결을 포기하지 않고 다시 시도한다(15초부터 최대 5분 간격).
+    // 로그인은 기기(WebView2·브라우저) 안에 남아 있어서 연결만 되면 저절로 이어진다.
     async function boot(cfg) {
+      if (booting || fb) return;
+      booting = true; bootCfg = cfg;
+      clearTimeout(bootTimer);
       setMode('busy', '동기화 서버에 연결하는 중…');
       try {
         const mods = await Promise.all([import(FB + 'firebase-app.js'), import(FB + 'firebase-auth.js'), import(FB + 'firebase-firestore.js')]);
@@ -154,9 +162,14 @@
           setMode('idle');
           syncNow(false);
         });
+        bootDelay = 15000;
       } catch (e) {
         fb = null;
-        setMode('err', '동기화 서버에 연결할 수 없습니다. 인터넷 연결을 확인해 주세요.');
+        setMode('err', '동기화 서버에 연결할 수 없습니다. 인터넷이 연결되면 자동으로 다시 시도합니다.');
+        bootTimer = setTimeout(() => boot(bootCfg), bootDelay);
+        bootDelay = Math.min(bootDelay * 2, 5 * 60 * 1000);
+      } finally {
+        booting = false;
       }
     }
 
@@ -214,13 +227,21 @@
     const cfg0 = savedConfig();
     if (cfg0) boot(cfg0);
 
-    setInterval(() => { if (user && document.visibilityState === 'visible') syncNow(false); }, 90000);
-    root.addEventListener && root.addEventListener('focus', () => { if (user && Date.now() - lastTry > 20000) syncNow(false); });
+    setInterval(() => { if (user) syncNow(false); }, AUTO_MS);
+    if (root.addEventListener) {
+      root.addEventListener('focus', () => { if (user && Date.now() - lastTry > FOCUS_MS) syncNow(false); });
+      root.addEventListener('online', () => {
+        if (!fb && bootCfg) { bootDelay = 15000; boot(bootCfg); }
+        else if (user) syncNow(false);
+      });
+    }
 
     return {
       state,
       get configured() { return !!savedConfig(); },
       get builtIn() { return !!root.DIARY_SYNC_CONFIG; },
+      get ready() { return !!fb; },
+      retry() { const c = savedConfig(); if (c && !fb) { bootDelay = 15000; boot(c); } },
       configure(text) {
         const cfg = parseConfig(text);
         if (!cfg) return false;
