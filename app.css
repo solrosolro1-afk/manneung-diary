@@ -202,6 +202,8 @@ textarea.bare { resize: none; line-height: 1.6; display: block; }
 .chk.on { background: var(--c, var(--b2)); border-color: var(--c, var(--b2)); }
 .chk.on svg { opacity: 1; }
 .done-text { text-decoration: line-through; color: var(--mute); }
+/* 완료한 계획: 줄 없이 글씨 색만 옅게 — 무엇을 했는지 그대로 읽힌다 */
+.done-soft { color: var(--mute); }
 
 .empty { color: var(--mute); font-size: 13px; padding: 6px 2px; line-height: 1.6; }
 .muted { color: var(--mute); }

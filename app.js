@@ -3,7 +3,7 @@
   // 바탕화면 프로그램(WebView2) 안에서 열리면 HOST 로 창 제어·파일 저장을 주고받는다.
   const HOST = (window.chrome && window.chrome.webview) || null;
   const KEY = 'manneung-diary-v1';
-  const VERSION = '1.3';
+  const VERSION = '1.3.1';
   const SVGNS = 'http://www.w3.org/2000/svg';
   const WD = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -708,7 +708,7 @@
             if (!P || !P.t.trim()) return;
             P.d = !P.d; save(); render();
           }, !hasT),
-          h('input.bare', {
+          h('input.bare' + (p && p.d ? '.done-soft' : ''), {
             value: p ? p.t : '', dataset: { row: i, col: 'p' }, 'aria-label': `${hr}시 계획`,
             oninput: e => {
               const P = planOf(k, hr, true);
@@ -916,7 +916,7 @@
         if (!p || !p.t.trim()) return;
         pl.push(h('div.pl', h('span.tm', pad(hr) + ':00'),
           chkBtn(p.d, catColor(p.c), () => { p.d = !p.d; save(); render(); }),
-          h('span.tx', p.t)));
+          h('span.tx' + (p.d ? '.done-soft' : ''), p.t)));
       });
       D.todos.forEach(t => {
         if (!t.t.trim()) return;
