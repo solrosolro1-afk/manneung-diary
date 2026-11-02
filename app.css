@@ -312,7 +312,13 @@ textarea.bare { resize: none; line-height: 1.6; display: block; }
 .hour small { font-size: 9px; font-weight: 700; color: var(--mute); }
 .trow.now .hour { background: var(--grad); color: #fff; }
 .trow.now .hour small { color: rgba(255, 255, 255, .85); }
-.trow.now { background: rgba(139, 92, 246, .035); }
+/* 지금 시간 줄: 가로선 대신 줄 전체 음영 + 위아래 보라 테두리 */
+.trow.now {
+  background: linear-gradient(90deg, rgba(139, 92, 246, .14), rgba(236, 72, 153, .09));
+  box-shadow: inset 0 1.5px 0 rgba(139, 92, 246, .45), inset 0 -1.5px 0 rgba(139, 92, 246, .45);
+  border-bottom-color: transparent;
+}
+.trow.now .pcell .bare { font-weight: 650; }
 .dcol { display: flex; align-items: center; gap: 6px; padding: 0 8px 0 8px; min-width: 0; }
 .dcells { display: grid; grid-template-columns: repeat(6, minmax(10px, 1fr)); gap: 2px; flex: 1; min-width: 72px; touch-action: none; }
 .dcell { height: 26px; border-radius: 5px; background: var(--cell); transition: background .08s, transform .08s; }
@@ -334,8 +340,17 @@ textarea.bare { resize: none; line-height: 1.6; display: block; }
 .fbtn.on { background: var(--fc); color: #fff; box-shadow: none; }
 .focus-sum { margin-top: 8px; }
 .focus-sum .fbtn { width: 16px; height: 16px; font-size: 9.5px; border-radius: 5px; }
-.nowline { position: absolute; left: 0; right: 0; height: 2px; background: var(--b3); z-index: 2; pointer-events: none; box-shadow: 0 0 0 2px rgba(236, 72, 153, .15); }
-.nowline::before { content: ''; position: absolute; left: -3px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--b3); }
+/* 지금 분: 지금 10분 칸에 분홍 테두리, 칸 안의 정확한 분 위치에 ▼ 달린 세로 표시(DO 칸 높이만큼만) */
+.dcell { position: relative; }
+.dcell.nowcell { box-shadow: inset 0 0 0 1.6px #ec4899; }
+.nowmark {
+  position: absolute; top: -4px; bottom: -2px; width: 2px; margin-left: -1px;
+  background: #ec4899; border-radius: 2px; pointer-events: none; z-index: 1;
+}
+.nowmark::before {
+  content: ''; position: absolute; top: -3px; left: 50%; transform: translateX(-50%);
+  border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 5px solid #ec4899;
+}
 .tl-body { position: relative; }
 
 /* ---------- 오늘 ---------- */

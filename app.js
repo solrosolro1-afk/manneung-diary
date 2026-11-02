@@ -3,7 +3,7 @@
   // 바탕화면 프로그램(WebView2) 안에서 열리면 HOST 로 창 제어·파일 저장을 주고받는다.
   const HOST = (window.chrome && window.chrome.webview) || null;
   const KEY = 'manneung-diary-v1';
-  const VERSION = '1.3.1';
+  const VERSION = '1.3.2';
   const SVGNS = 'http://www.w3.org/2000/svg';
   const WD = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -742,7 +742,7 @@
         }, f))));
     });
 
-    const body = h('div.tl-body', rows, h('div.nowline', { hidden: true }));
+    const body = h('div.tl-body', rows);
     // 칸은 시간 순서대로 이어져 있으므로, 끌다가 건너뛴 칸도 시작~현재 사이를 모두 칠한다.
     const allCells = () => Array.from(body.querySelectorAll('.dcell'));
     body.addEventListener('pointerdown', e => {
@@ -836,20 +836,19 @@
     const off = row.getBoundingClientRect().top - sc.getBoundingClientRect().top;
     sc.scrollTop = Math.max(0, sc.scrollTop + off - 150);
   }
+  // 지금 시각 표시: 가로선 대신 그 시간 줄 전체에 음영을 주고,
+  // 분은 DO 칸 안에서만 표시한다(지금 10분 칸 테두리 + 그 안의 정확한 분 위치에 ▼ 세로 표시).
   function placeNowLine() {
-    const line = $('.nowline');
-    if (!line) return;
-    const now = new Date();
-    if (U.tab !== 'day' || U.cur !== todayKey()) { line.hidden = true; return; }
-    let row = null;
-    document.querySelectorAll('.trow').forEach(r => {
-      const on = +r.dataset.h === now.getHours();
-      r.classList.toggle('now', on);
-      if (on) row = r;
-    });
-    if (!row) { line.hidden = true; return; }
-    line.hidden = false;
-    line.style.top = (row.offsetTop + row.offsetHeight * now.getMinutes() / 60 - 1) + 'px';
+    document.querySelectorAll('.nowmark').forEach(e => e.remove());
+    document.querySelectorAll('.dcell.nowcell').forEach(e => e.classList.remove('nowcell'));
+    const now = new Date(), hr = now.getHours(), m = now.getMinutes();
+    const on = U.tab === 'day' && U.cur === todayKey();
+    document.querySelectorAll('.trow').forEach(r => r.classList.toggle('now', on && +r.dataset.h === hr));
+    if (!on) return;
+    const cell = document.querySelector(`.dcell[data-h="${hr}"][data-j="${Math.floor(m / 10)}"]`);
+    if (!cell) return;
+    cell.classList.add('nowcell');
+    cell.append(h('span.nowmark', { style: { left: ((m % 10) / 10 * 100) + '%' }, title: `지금 ${pad(hr)}:${pad(m)}` }));
   }
 
   // ---------- 미니 달력 ----------
