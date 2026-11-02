@@ -3,7 +3,7 @@
   // 바탕화면 프로그램(WebView2) 안에서 열리면 HOST 로 창 제어·파일 저장을 주고받는다.
   const HOST = (window.chrome && window.chrome.webview) || null;
   const KEY = 'manneung-diary-v1';
-  const VERSION = '1.3.2';
+  const VERSION = '1.3.3';
   const SVGNS = 'http://www.w3.org/2000/svg';
   const WD = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -836,8 +836,8 @@
     const off = row.getBoundingClientRect().top - sc.getBoundingClientRect().top;
     sc.scrollTop = Math.max(0, sc.scrollTop + off - 150);
   }
-  // 지금 시각 표시: 가로선 대신 그 시간 줄 전체에 음영을 주고,
-  // 분은 DO 칸 안에서만 표시한다(지금 10분 칸 테두리 + 그 안의 정확한 분 위치에 ▼ 세로 표시).
+  // 지금 시각 표시: 가로선 대신 그 시간 줄 전체에 연노랑 음영을 주고,
+  // 분은 DO 칸에서만 표시한다(지금 10분 칸 옅은 테두리 + 칸 아래 정확한 분 위치에 작은 ▲).
   function placeNowLine() {
     document.querySelectorAll('.nowmark').forEach(e => e.remove());
     document.querySelectorAll('.dcell.nowcell').forEach(e => e.classList.remove('nowcell'));
