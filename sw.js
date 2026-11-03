@@ -1,7 +1,7 @@
 // 폰·탭 웹앱용 오프라인 동작.
 // 앱 파일은 인터넷이 되면 늘 새로 받고(수정본이 바로 반영되게), 안 되면 받아 둔 것으로 연다.
 // Firebase 라이브러리(gstatic)도 받아 두어 오프라인에서도 앱이 뜨게 한다. 기록 자체는 기기 안에 저장된다.
-const VERSION = '1.3.3';
+const VERSION = '1.4.0';
 const CACHE = 'manneung-diary-' + VERSION;
 const PRECACHE = ['./', 'index.html', 'manifest.webmanifest', 'app.css', 'app.js', 'holidays.js', 'sync.js', 'sync-config.js',
   'fonts/PretendardVariable.woff2', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png'];
@@ -20,7 +20,8 @@ self.addEventListener('activate', e => {
 async function networkFirst(req) {
   const c = await caches.open(CACHE);
   try {
-    const res = await fetch(req);
+    // no-cache: 브라우저 HTTP 캐시(깃허브 Pages 10분)를 건너뛰고 늘 서버에 새 파일이 있는지 확인한다
+    const res = await fetch(req, { cache: 'no-cache' });
     if (res.ok) c.put(req, res.clone());
     return res;
   } catch (err) {

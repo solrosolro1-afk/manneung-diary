@@ -201,6 +201,21 @@ textarea.bare { resize: none; line-height: 1.6; display: block; }
 .chk:hover { border-color: var(--b2); }
 .chk.on { background: var(--c, var(--b2)); border-color: var(--c, var(--b2)); }
 .chk.on svg { opacity: 1; }
+/* 계획 결과: △ 일부 지킴(주황) · ✕ 못 지킴(빨강) */
+.chk.part { background: #f59e0b; border-color: #f59e0b; }
+.chk.miss { background: #ef4444; border-color: #ef4444; }
+.chk.part svg, .chk.miss svg { opacity: 1; }
+.pop button.mko { color: #7c3aed; }
+.pop button.mkp { color: #d97706; }
+.pop button.mkx { color: #dc2626; }
+.pop button.mknone { color: var(--mute); }
+.bar.bar3 { display: flex; }
+.bar.bar3 i { border-radius: 0; }
+.bar.bar3 i.mo { background: var(--b2); }
+.bar.bar3 i.mp { background: #f59e0b; }
+.bar.bar3 i.mx { background: #ef4444; }
+.mk-brk { display: flex; gap: 8px; margin-top: 5px; font-size: 11.5px; font-weight: 750; }
+.mk-brk .mko { color: #7c3aed; } .mk-brk .mkp { color: #d97706; } .mk-brk .mkx { color: #dc2626; }
 .done-text { text-decoration: line-through; color: var(--mute); }
 /* 완료한 계획: 줄 없이 글씨 색만 옅게 — 무엇을 했는지 그대로 읽힌다 */
 .done-soft { color: var(--mute); }

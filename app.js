@@ -3,7 +3,7 @@
   // 바탕화면 프로그램(WebView2) 안에서 열리면 HOST 로 창 제어·파일 저장을 주고받는다.
   const HOST = (window.chrome && window.chrome.webview) || null;
   const KEY = 'manneung-diary-v1';
-  const VERSION = '1.3.3';
+  const VERSION = '1.4';
   const SVGNS = 'http://www.w3.org/2000/svg';
   const WD = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -42,6 +42,10 @@
     book: '<path d="M5.5 4.5h11a2 2 0 0 1 2 2v13h-11a2 2 0 0 1-2-2z"/><path d="M5.5 17.5a2 2 0 0 1 2-2h11M9 8.5h6"/>'
   };
   const CHECK = '<path d="m5 12.5 4.5 4.5L19 7.5"/>';
+  // 계획 결과: o 완료(✓) · p 일부(△ 주황) · x 못 지킴(✕ 빨강). 누를 때마다 빈칸→✓→△→✕→빈칸.
+  const MARK_SVG = { o: CHECK, p: '<path d="M12 5.5 19 18H5z"/>', x: '<path d="M7 7l10 10M17 7 7 17"/>' };
+  const MARK_NEXT = { '': 'o', o: 'p', p: 'x', x: '' };
+  const planResult = p => p ? (p.r || (p.d ? 'o' : '')) : '';
 
   const DEFAULT_CATS = [
     { id: 'c1', name: '업무', color: '#4f7df3' },
@@ -210,7 +214,7 @@
   function tidyDay(k) {
     const D = S.days[k];
     if (!D) return;
-    for (const hr in D.plan) { const p = D.plan[hr]; if (!p.t.trim() && !p.c && !p.d) delete D.plan[hr]; }
+    for (const hr in D.plan) { const p = D.plan[hr]; if (!p.t.trim() && !p.c && !p.d && !p.r) delete D.plan[hr]; }
     for (const hr in D.act) { const a = D.act[hr]; if (!a.cells.some(Boolean) && !a.m.trim() && !a.f) delete D.act[hr]; }
   }
   function dayHasData(D) {
@@ -219,12 +223,18 @@
       Object.values(D.act).some(a => a.cells.some(Boolean) || a.m.trim() || a.f) || !!D.see.trim();
   }
   function dayStats(k) {
-    const r = { total: 0, done: 0, mins: 0, byCat: {}, focus: { H: 0, M: 0, L: 0 } };
+    const r = { total: 0, done: 0, part: 0, miss: 0, pct: 0, mins: 0, byCat: {}, focus: { H: 0, M: 0, L: 0 } };
     const D = S.days[k];
     if (!D) return r;
     for (const a of Object.values(D.act)) if (a.f && r.focus[a.f] != null) r.focus[a.f]++;
-    for (const p of Object.values(D.plan)) if (p.t.trim()) { r.total++; if (p.d) r.done++; }
+    for (const p of Object.values(D.plan)) if (p.t.trim()) {
+      r.total++;
+      const v = planResult(p);
+      if (v === 'o') r.done++; else if (v === 'p') r.part++; else if (v === 'x') r.miss++;
+    }
     for (const t of D.todos) if (t.t.trim()) { r.total++; if (t.d) r.done++; }
+    // 달성률: △(일부)는 절반으로 친다(사용자 선택 a)
+    r.pct = r.total ? Math.round((r.done + r.part * 0.5) / r.total * 100) : 0;
     for (const a of Object.values(D.act)) for (const c of a.cells) if (c) { r.mins += 10; r.byCat[c] = (r.byCat[c] || 0) + 10; }
     return r;
   }
@@ -275,6 +285,43 @@
     return h('button.chk' + (on ? '.on' : '') + (dim ? '.dim' : ''), {
       type: 'button', style: color ? { '--c': color } : null, 'aria-pressed': on ? 'true' : 'false', onclick: fn
     }, svgEl(CHECK));
+  }
+  // 계획 결과 버튼: 누르면 ✓→△→✕→빈칸 순서로 바뀌고, 오른쪽 클릭(폰은 길게 누르기)이면 선택창에서 바로 고른다.
+  function markBtn(k, hr, p, color, dim) {
+    const cur = planResult(p);
+    const setR = v => {
+      const P = planOf(k, hr, false);
+      if (!P || !P.t.trim()) return;
+      P.r = v; P.d = v === 'o';
+      tidyDay(k); save(); render();
+    };
+    const menu = el => {
+      const P = planOf(k, hr, false);
+      if (!P || !P.t.trim()) return;
+      const now = planResult(P);
+      openPop(el, close => [h('div.ph', '계획 결과'),
+        [['o', '✓ 완료'], ['p', '△ 일부 지킴'], ['x', '✕ 못 지킴'], ['', '지우기']].map(m =>
+          h('button.mk' + (m[0] || 'none') + (now === m[0] ? '.on' : ''), { onclick: () => { close(); setR(m[0]); } }, m[1]))]);
+    };
+    let longT = 0, longFired = false;
+    const stopLong = () => clearTimeout(longT);
+    return h('button.chk' + (cur === 'o' ? '.on' : cur === 'p' ? '.part' : cur === 'x' ? '.miss' : '') + (dim ? '.dim' : ''), {
+      type: 'button', style: color && cur === 'o' ? { '--c': color } : null,
+      title: '누를 때마다 ✓ 완료 → △ 일부 → ✕ 못 지킴 → 빈칸 · 오른쪽 클릭(폰은 길게 누르기)으로 바로 고르기',
+      onclick: () => {
+        if (longFired) { longFired = false; return; }
+        const P = planOf(k, hr, false);
+        if (P && P.t.trim()) setR(MARK_NEXT[planResult(P)]);
+      },
+      oncontextmenu: e => { e.preventDefault(); menu(e.currentTarget); },
+      onpointerdown: e => {
+        if (e.pointerType !== 'touch') return;
+        const el = e.currentTarget;
+        longFired = false; stopLong();
+        longT = setTimeout(() => { longFired = true; menu(el); }, 500);
+      },
+      onpointerup: stopLong, onpointerleave: stopLong, onpointercancel: stopLong
+    }, svgEl(MARK_SVG[cur] || CHECK));
   }
   function catBtn(cid, onOpen) {
     const c = catColor(cid);
@@ -703,11 +750,7 @@
       const sub = i === 0 ? (hr < 12 ? '오전' : '오후') : hr === 12 ? '정오' : hr === 0 ? '자정' : '';
       return h('div.trow' + (k === t && hr === nowH ? '.now' : '') + (hr === 12 && i ? '.noon' : ''), { dataset: { h: hr } },
         h('div.pcell' + (pc ? '.has-c' : ''), { style: pc ? { '--c': pc } : null },
-          chkBtn(p && p.d, pc, () => {
-            const P = planOf(k, hr, false);
-            if (!P || !P.t.trim()) return;
-            P.d = !P.d; save(); render();
-          }, !hasT),
+          markBtn(k, hr, p, pc, !hasT),
           h('input.bare' + (p && p.d ? '.done-soft' : ''), {
             value: p ? p.t : '', dataset: { row: i, col: 'p' }, 'aria-label': `${hr}시 계획`,
             oninput: e => {
@@ -784,13 +827,15 @@
   }
 
   function summaryCard(k) {
-    const st = dayStats(k), pct = st.total ? Math.round(st.done / st.total * 100) : 0;
+    const st = dayStats(k), pct = st.pct;
     const segs = Object.entries(st.byCat).sort((a, b) => b[1] - a[1]);
+    const w = n => (st.total ? n / st.total * 100 : 0) + '%';
     return h('div.card.sum-card',
       h('div.card-h', h('h3', k === todayKey() ? '오늘의 결과' : '이 날의 결과')),
       h('div.stats',
-        h('div.stat', h('div.k', '계획 달성'), h('div.v', pct + '%', h('small', `${st.done}/${st.total}`)),
-          h('div.bar', h('i', { style: { width: pct + '%' } }))),
+        h('div.stat', h('div.k', '계획 달성'), h('div.v', pct + '%', h('small', `/${st.total}개`)),
+          h('div.bar.bar3', h('i.mo', { style: { width: w(st.done) } }), h('i.mp', { style: { width: w(st.part) } }), h('i.mx', { style: { width: w(st.miss) } })),
+          h('div.mk-brk', h('span.mko', '✓' + st.done), h('span.mkp', '△' + st.part), h('span.mkx', '✕' + st.miss))),
         h('div.stat', h('div.k', '실적 기록'), h('div.v', st.mins ? fmtMin(st.mins) : '—'),
           h('div.bar', h('i', { style: { width: Math.min(100, st.mins / 960 * 100) + '%' } })))),
       st.mins
@@ -889,7 +934,7 @@
   }
   function viewHome() {
     const k = todayKey(), d = parse(k), D = S.days[k], st = dayStats(k);
-    const pct = st.total ? Math.round(st.done / st.total * 100) : 0;
+    const pct = st.pct;
     const habs = activeHabits(), habDone = habs.filter(x => isChecked(x.id, k)).length;
     const hol = holidayOf(k);
     const C = 2 * Math.PI * 30;
@@ -903,7 +948,7 @@
           h('div.d3', heroLine(k))),
         h('div.ring', ring, h('b', h('span', pct + '%', h('small', '계획 달성'))))),
       h('div.pills',
-        h('span.pill', `계획 ${st.done}/${st.total}`),
+        h('span.pill', `계획 ✓${st.done} △${st.part} ✕${st.miss} / ${st.total}`),
         h('span.pill', `실적 ${st.mins ? fmtMin(st.mins) : '0분'}`),
         habs.length ? h('span.pill', `습관 ${habDone}/${habs.length}`) : null));
 
@@ -914,8 +959,8 @@
         const p = D.plan[hr];
         if (!p || !p.t.trim()) return;
         pl.push(h('div.pl', h('span.tm', pad(hr) + ':00'),
-          chkBtn(p.d, catColor(p.c), () => { p.d = !p.d; save(); render(); }),
-          h('span.tx' + (p.d ? '.done-soft' : ''), p.t)));
+          markBtn(k, hr, p, catColor(p.c), false),
+          h('span.tx' + (planResult(p) === 'o' ? '.done-soft' : ''), p.t)));
       });
       D.todos.forEach(t => {
         if (!t.t.trim()) return;
@@ -926,7 +971,7 @@
     }
     const openDay = () => { U.tab = 'day'; U.cur = k; U.forceScroll = true; render(); };
     const planCard = h('div.card',
-      h('div.card-h', h('h3', '오늘 계획', h('em', `${st.done}/${st.total}`)), h('div.sp'),
+      h('div.card-h', h('h3', '오늘 계획', h('em', `달성 ${st.pct}%`)), h('div.sp'),
         h('button.btn.sm', { onclick: openDay }, '일간 열기', icon('open'))),
       pl.length ? h('div.plist', pl) : h('div.empty', '아직 계획이 없어요. 일간에서 시간별 계획을 적거나 전날 계획을 가져와 보세요.',
         h('div.row', { style: { marginTop: '8px' } },
@@ -1008,8 +1053,8 @@
           S.journal[dk] && S.journal[dk].mood ? h('span.mmood', { title: '일기 기분: ' + MOODS[S.journal[dk].mood].n }, MOODS[S.journal[dk].mood].e) : null),
         items.slice(0, show),
         items.length > show && h('div.more', `+${items.length - show}`),
-        st.total ? h('div.mprog', { title: `계획 ${st.done}/${st.total} 완료` },
-          h('i', { style: { width: Math.round(st.done / st.total * 100) + '%' } })) : null);
+        st.total ? h('div.mprog', { title: `계획 달성 ${st.pct}% (✓${st.done} △${st.part} ✕${st.miss} / ${st.total})` },
+          h('i', { style: { width: st.pct + '%' } })) : null);
     });
     const grid = h('div.card', { style: { padding: '6px 6px 4px' } }, h('div.mgrid', heads, cells));
     const goals = h('div.card',
@@ -1087,7 +1132,7 @@
         h('div.sec', h('div.sec-t', '일간'),
           h('div.row',
             h('div.grow.muted', { style: { fontSize: '13px' } },
-              st.total || st.mins ? `계획 ${st.done}/${st.total} 완료 · 실적 ${fmtMin(st.mins)}` : '아직 기록이 없습니다'),
+              st.total || st.mins ? `계획 달성 ${st.pct}% (✓${st.done} △${st.part} ✕${st.miss}) · 실적 ${fmtMin(st.mins)}` : '아직 기록이 없습니다'),
             h('button.btn.sm.pri', {
               onclick: () => { sheet = null; drawSheet(); U.tab = 'day'; U.cur = dk; U.forceScroll = true; render(); }
             }, '일간 열기', icon('open'))))
