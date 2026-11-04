@@ -3,7 +3,7 @@
   // 바탕화면 프로그램(WebView2) 안에서 열리면 HOST 로 창 제어·파일 저장을 주고받는다.
   const HOST = (window.chrome && window.chrome.webview) || null;
   const KEY = 'manneung-diary-v1';
-  const VERSION = '1.4';
+  const VERSION = '1.4.1';
   const SVGNS = 'http://www.w3.org/2000/svg';
   const WD = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -385,12 +385,17 @@
     if (!sheet) { root.replaceChildren(); return; }
     const old = root.querySelector('.sheet');
     const st = old ? old.scrollTop : 0;
+    // 창 안의 목록처럼 따로 스크롤되는 칸(data-keepy)도 다시 그린 뒤 같은 자리를 유지한다.
+    // 값이 다르면(예: 다른 날짜 목록) 맨 위부터 보인다.
+    const ys = {};
+    if (old) old.querySelectorAll('[data-keepy]').forEach(e => { ys[e.dataset.keepy] = e.scrollTop; });
     const panel = h('div.sheet', { role: 'dialog' }, h('div.grip'), sheet.build());
     const back = h('div.sheet-back', { onclick: () => closeSheet() });
     if (!sheet.fresh) { panel.style.animation = 'none'; back.style.animation = 'none'; }
     sheet.fresh = false;
     root.replaceChildren(back, panel);
     panel.scrollTop = st;
+    panel.querySelectorAll('[data-keepy]').forEach(e => { if (ys[e.dataset.keepy] != null) e.scrollTop = ys[e.dataset.keepy]; });
     panel.querySelectorAll('textarea.auto').forEach(autosize);
     if (U.focus) {
       const f = panel.querySelector(`[data-focus="${U.focus}"]`);
@@ -630,7 +635,7 @@
             h('button.btn.sm', { onclick: () => { sel.clear(); drawSheet(); } }, '전체 해제'),
             h('div.grow'),
             h('span.muted', { style: { fontSize: '12px' } }, `${sel.size}개 선택`)),
-          h('div.slotlist', rows.map(r => {
+          h('div.slotlist', { dataset: { keepy: 'slot-' + src } }, rows.map(r => {
             const on = sel.has(r.k);
             const busy = r.t ? false : !!(T && T.plan[r.hr] && T.plan[r.hr].t.trim());
             const c = r.t ? catColor(r.t.c) : r.p ? catColor(r.p.c) : null;
