@@ -271,6 +271,9 @@ textarea.bare { resize: none; line-height: 1.6; display: block; }
 .todo .x { opacity: 0; }
 .add-line { display: flex; align-items: center; gap: 6px; margin-top: 4px; color: var(--mute); }
 .add-line svg.i { width: 16px; height: 16px; margin-left: 1px; }
+form.add-line { margin-bottom: 0; }
+.add-line .addbtn { flex: none; padding: 4px 11px; color: var(--b2); border-color: #d9d6fb; }
+.add-line input:placeholder-shown + .addbtn { opacity: .4; }
 
 .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .stat { background: var(--soft); border-radius: 12px; padding: 10px 12px; }

@@ -3,7 +3,7 @@
   // 바탕화면 프로그램(WebView2) 안에서 열리면 HOST 로 창 제어·파일 저장을 주고받는다.
   const HOST = (window.chrome && window.chrome.webview) || null;
   const KEY = 'manneung-diary-v1';
-  const VERSION = '1.4.1';
+  const VERSION = '1.4.2';
   const SVGNS = 'http://www.w3.org/2000/svg';
   const WD = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -285,6 +285,18 @@
     return h('button.chk' + (on ? '.on' : '') + (dim ? '.dim' : ''), {
       type: 'button', style: color ? { '--c': color } : null, 'aria-pressed': on ? 'true' : 'false', onclick: fn
     }, svgEl(CHECK));
+  }
+  // 새 항목 입력 줄: 폰 키보드(특히 한글 입력)는 Enter 키 이벤트를 보내지 않을 때가 많아서,
+  // 폼 제출(키보드의 완료·이동·Enter 키)과 '추가' 버튼 둘 다로 받는다. 버튼은 글자를 적으면 진해진다.
+  function addLine(placeholder, focusKey, onAdd, style) {
+    const inp = h('input.bare', { placeholder, dataset: { focus: focusKey }, enterkeyhint: 'done', autocomplete: 'off' });
+    return h('form.add-line', {
+      style, onsubmit: e => {
+        e.preventDefault();
+        const v = inp.value.trim();
+        if (v) onAdd(v);
+      }
+    }, icon('plus'), inp, h('button.btn.sm.addbtn', { type: 'submit', title: '추가' }, '추가'));
   }
   // 계획 결과 버튼: 누르면 ✓→△→✕→빈칸 순서로 바뀌고, 오른쪽 클릭(폰은 길게 누르기)이면 선택창에서 바로 고른다.
   function markBtn(k, hr, p, color, dim) {
@@ -703,14 +715,10 @@
         }),
         catBtn(t.c, a => openCatMenu(a, t.c, id => { t.c = id; save(); render(); })),
         h('button.ib.sm.x', { title: '삭제', onclick: () => removeWithUndo(list, t, '할 일을 지웠습니다') }, icon('x')))),
-      h('div.add-line', icon('plus'), h('input.bare', {
-        placeholder: '할 일 추가 후 Enter', dataset: { focus: 'todo-add' },
-        onkeydown: e => {
-          if (e.key !== 'Enter' || !e.target.value.trim()) return;
-          day(k, true).todos.push({ id: uid(), t: e.target.value.trim(), c: null, d: false });
-          save(); U.focus = 'todo-add'; render();
-        }
-      })));
+      addLine('할 일 추가', 'todo-add', v => {
+        day(k, true).todos.push({ id: uid(), t: v, c: null, d: false });
+        save(); U.focus = 'todo-add'; render();
+      }));
   }
 
   function rowKeys(e) {
@@ -981,14 +989,10 @@
       pl.length ? h('div.plist', pl) : h('div.empty', '아직 계획이 없어요. 일간에서 시간별 계획을 적거나 전날 계획을 가져와 보세요.',
         h('div.row', { style: { marginTop: '8px' } },
           h('button.btn.sm', { onclick: () => { U.cur = k; copyPrev('all'); } }, icon('copy'), '전날 계획 가져오기'))),
-      h('div.add-line', icon('plus'), h('input.bare', {
-        placeholder: '할 일 빠르게 추가 후 Enter', dataset: { focus: 'home-add' },
-        onkeydown: e => {
-          if (e.key !== 'Enter' || !e.target.value.trim()) return;
-          day(k, true).todos.push({ id: uid(), t: e.target.value.trim(), c: null, d: false });
-          save(); U.focus = 'home-add'; render();
-        }
-      })));
+      addLine('할 일 빠르게 추가', 'home-add', v => {
+        day(k, true).todos.push({ id: uid(), t: v, c: null, d: false });
+        save(); U.focus = 'home-add'; render();
+      }));
 
     const habitCard = h('div.card',
       h('div.card-h', h('h3', '오늘 습관', habs.length ? h('em', `${habDone}/${habs.length}`) : null), h('div.sp'),
@@ -1089,14 +1093,10 @@
             save(); drawSheet();
           }
         }, icon('x')))),
-      h('div.add-line', icon('plus'), h('input.bare', {
-        placeholder: '일정 추가 후 Enter', dataset: { focus: 'mi-add' },
-        onkeydown: e => {
-          if (e.key !== 'Enter' || !e.target.value.trim()) return;
-          (S.mItems[dk] = S.mItems[dk] || []).push({ id: uid(), t: e.target.value.trim(), c: null });
-          save(); U.focus = 'mi-add'; drawSheet();
-        }
-      }))
+      addLine('일정 추가', 'mi-add', v => {
+        (S.mItems[dk] = S.mItems[dk] || []).push({ id: uid(), t: v, c: null });
+        save(); U.focus = 'mi-add'; drawSheet();
+      })
     ];
   }
   function yearEditor(dk) {
@@ -1114,14 +1114,10 @@
             title: '삭제', onclick: () => { S.yItems.splice(S.yItems.indexOf(it), 1); save(); drawSheet(); }
           }, icon('x')));
       }),
-      h('div.add-line', icon('plus'), h('input.bare', {
-        placeholder: '기념일·연간 일정 추가 후 Enter', dataset: { focus: 'yi-add' },
-        onkeydown: e => {
-          if (e.key !== 'Enter' || !e.target.value.trim()) return;
-          S.yItems.push({ id: uid(), date: dk, t: e.target.value.trim(), c: null, rep: false });
-          save(); U.focus = 'yi-add'; drawSheet();
-        }
-      }))
+      addLine('기념일·연간 일정 추가', 'yi-add', v => {
+        S.yItems.push({ id: uid(), date: dk, t: v, c: null, rep: false });
+        save(); U.focus = 'yi-add'; drawSheet();
+      })
     ];
   }
   function openDateSheet(dk, from) {
@@ -1249,14 +1245,10 @@
       habits.length
         ? h('div.hwrap', { dataset: { keepx: '' } }, h('table.htable', h('thead', head), h('tbody', rows)))
         : h('div.empty', '매일 체크할 습관을 추가해 보세요. 예) 운동 30분 · 물 2L · 독서 20쪽'),
-      h('div.add-line', { style: { marginTop: '10px' } }, icon('plus'), h('input.bare', {
-        placeholder: '새 습관 이름 입력 후 Enter', dataset: { focus: 'hb-add' },
-        onkeydown: e => {
-          if (e.key !== 'Enter' || !e.target.value.trim()) return;
-          S.habits.push({ id: uid(), name: e.target.value.trim(), c: PALETTE[(S.habits.length * 5 + 1) % PALETTE.length], arch: false });
-          save(); U.focus = 'hb-add'; render();
-        }
-      }))));
+      addLine('새 습관 이름', 'hb-add', v => {
+        S.habits.push({ id: uid(), name: v, c: PALETTE[(S.habits.length * 5 + 1) % PALETTE.length], arch: false });
+        save(); U.focus = 'hb-add'; render();
+      }, { marginTop: '10px' })));
   }
   function scrollHabit(view) {
     const wrap = view.querySelector('.hwrap'), cur = wrap && wrap.querySelector('th.cur');
